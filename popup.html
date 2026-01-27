@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NoPause 视频防暂停</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>NoPause 视频防暂停</h1>
+    </header>
+
+    <main class="main">
+      <div class="domain-info">
+        <span class="label">当前网站:</span>
+        <span class="domain" id="currentDomain">-</span>
+      </div>
+
+      <div class="toggle-container">
+        <label class="toggle">
+          <input type="checkbox" id="enableToggle">
+          <span class="slider"></span>
+        </label>
+        <span class="toggle-label" id="toggleLabel">未启用</span>
+      </div>
+
+      <div class="status-message" id="statusMessage">
+        <span class="status-icon">✓</span>
+        <span class="status-text">视频不会因切换标签而暂停</span>
+      </div>
+
+      <div class="refresh-hint" id="refreshHint">
+        刷新页面后生效
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="advanced-toggle" id="advancedToggle">
+        <span>高级选项</span>
+        <span class="arrow" id="advancedArrow">▼</span>
+      </div>
+
+      <div class="advanced-options" id="advancedOptions">
+        <label class="checkbox-label">
+          <input type="checkbox" id="blockBlurCheckbox">
+          <span class="checkmark"></span>
+          <span>同时阻止窗口失焦检测</span>
+        </label>
+      </div>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
