@@ -25,7 +25,7 @@ NoPause 让你重新掌控播放权。
 ## 安装
 
 1. 下载本项目
-2. 打开 Chrome，访问 `chrome://extensions/`
+2. 打开 Chrome或Edge，访问 `chrome://extensions/` 或 `edge://extensions/`
 3. 开启右上角「开发者模式」
 4. 点击「加载已解压的扩展程序」
 5. 选择本项目文件夹
