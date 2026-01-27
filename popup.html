@@ -3,39 +3,84 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NoPause 视频防暂停</title>
+  <title>NoPause</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <div class="container">
-    <header class="header">
-      <h1>NoPause 视频防暂停</h1>
-    </header>
+    <!-- Header -->
+    <div class="header">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8 5v14l11-7-11-7z" fill="currentColor"/>
+          </svg>
+        </div>
+        <span class="logo-text">NoPause</span>
+      </div>
+    </div>
 
-    <main class="main">
-      <div class="domain-info">
-        <span class="label">当前网站:</span>
-        <span class="domain" id="currentDomain">-</span>
+    <!-- Content -->
+    <div class="content">
+      <!-- Site Info -->
+      <div class="glass-card" id="siteCard">
+        <div class="site-info">
+          <div class="site-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+            </svg>
+          </div>
+          <div class="site-details">
+            <div class="site-label">当前网站</div>
+            <div class="site-domain" id="currentDomain">-</div>
+          </div>
+        </div>
       </div>
 
-      <div class="toggle-container">
-        <label class="toggle">
-          <input type="checkbox" id="enableToggle">
-          <span class="slider"></span>
-        </label>
-        <span class="toggle-label" id="toggleLabel">未启用</span>
+      <!-- Toggle -->
+      <div class="glass-card" id="toggleCard">
+        <div class="toggle-section">
+          <div class="toggle-info">
+            <div class="toggle-title" id="toggleLabel">防暂停保护</div>
+            <div class="toggle-desc" id="statusDesc">点击开关启用</div>
+          </div>
+          <label class="toggle-wrapper">
+            <input type="checkbox" id="enableToggle">
+            <div class="toggle-track">
+              <div class="toggle-thumb"></div>
+            </div>
+          </label>
+        </div>
       </div>
 
-      <div class="status-message" id="statusMessage">
-        <span class="status-icon">✓</span>
-        <span class="status-text">视频不会因切换标签而暂停</span>
+      <!-- Status -->
+      <div class="status-indicator inactive" id="statusIndicator">
+        <span class="status-dot"></span>
+        <span class="status-text" id="statusText">保护未启用</span>
       </div>
 
-      <div class="refresh-hint" id="refreshHint">
-        <span>刷新页面后生效</span>
-        <button class="refresh-btn" id="refreshBtn">刷新</button>
+      <!-- Action -->
+      <div class="action-bar" id="actionBar">
+        <button class="btn-refresh" id="refreshBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 4v6h-6M1 20v-6h6"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+          <span>刷新页面生效</span>
+        </button>
       </div>
-    </main>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <span class="footer-text">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        切换标签时视频继续播放
+      </span>
+    </div>
   </div>
 
   <script src="popup.js"></script>

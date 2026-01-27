@@ -4,13 +4,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   const currentDomainEl = document.getElementById('currentDomain');
   const enableToggle = document.getElementById('enableToggle');
   const toggleLabel = document.getElementById('toggleLabel');
-  const statusMessage = document.getElementById('statusMessage');
-  const refreshHint = document.getElementById('refreshHint');
+  const statusDesc = document.getElementById('statusDesc');
+  const statusIndicator = document.getElementById('statusIndicator');
+  const statusText = document.getElementById('statusText');
+  const actionBar = document.getElementById('actionBar');
   const refreshBtn = document.getElementById('refreshBtn');
+  const siteCard = document.getElementById('siteCard');
+  const toggleCard = document.getElementById('toggleCard');
 
   let currentDomain = '';
   let isEnabled = false;
-  let needsRefresh = false;
 
   // Extract domain from hostname
   function extractDomain(hostname) {
@@ -24,22 +27,38 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Update UI based on state
-  function updateUI() {
+  function updateUI(showRefresh = false) {
     if (isEnabled) {
-      toggleLabel.textContent = '已启用';
-      toggleLabel.classList.add('enabled');
-      statusMessage.classList.add('visible');
+      toggleLabel.textContent = '防暂停保护';
+      statusDesc.textContent = '已为此网站启用';
+      statusIndicator.classList.remove('inactive');
+      statusIndicator.classList.add('active');
+      statusText.textContent = '保护已启用';
     } else {
-      toggleLabel.textContent = '未启用';
-      toggleLabel.classList.remove('enabled');
-      statusMessage.classList.remove('visible');
+      toggleLabel.textContent = '防暂停保护';
+      statusDesc.textContent = '点击开关启用';
+      statusIndicator.classList.remove('active');
+      statusIndicator.classList.add('inactive');
+      statusText.textContent = '保护未启用';
     }
 
-    if (needsRefresh) {
-      refreshHint.classList.add('visible');
+    if (showRefresh) {
+      actionBar.classList.add('visible');
     } else {
-      refreshHint.classList.remove('visible');
+      actionBar.classList.remove('visible');
     }
+  }
+
+  // Show unsupported state
+  function showUnsupported(message) {
+    currentDomainEl.textContent = message;
+    document.querySelector('.toggle-wrapper').classList.add('disabled');
+    enableToggle.disabled = true;
+    statusDesc.textContent = '无法在此页面使用';
+    statusIndicator.classList.remove('active');
+    statusIndicator.classList.add('inactive');
+    statusText.textContent = '不支持此页面';
+    toggleCard.classList.add('disabled');
   }
 
   // Initialize popup
@@ -48,8 +67,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const tab = await getCurrentTab();
 
       if (!tab || !tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('edge://') || tab.url.startsWith('about:')) {
-        currentDomainEl.textContent = '不支持此页面';
-        enableToggle.disabled = true;
+        showUnsupported('系统页面');
         return;
       }
 
@@ -64,11 +82,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       isEnabled = whitelist.includes(currentDomain);
       enableToggle.checked = isEnabled;
 
-      updateUI();
+      updateUI(false);
     } catch (error) {
       console.error('Init error:', error);
-      currentDomainEl.textContent = '加载失败';
-      enableToggle.disabled = true;
+      showUnsupported('加载失败');
     }
   }
 
@@ -88,36 +105,29 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       try {
         await chrome.tabs.sendMessage(tab.id, {
-          action: 'enableNow',
-          blockBlur: true  // Always enable blur blocking
+          action: 'enableNow'
         });
-        // Even if injection succeeds, page scripts may have already added listeners
-        // So we should refresh to ensure full protection
-        needsRefresh = true;
       } catch (e) {
-        // Content script might not be ready, show refresh hint
-        needsRefresh = true;
+        // Content script might not be ready
       }
+
+      // Update badge
+      chrome.action.setBadgeText({ tabId: tab.id, text: 'ON' });
+      chrome.action.setBadgeBackgroundColor({ tabId: tab.id, color: '#10b981' });
     } else {
       // Remove from whitelist
       await chrome.runtime.sendMessage({
         action: 'removeFromWhitelist',
         domain: currentDomain
       });
-      needsRefresh = true;
+
+      // Update badge
+      const tab = await getCurrentTab();
+      chrome.action.setBadgeText({ tabId: tab.id, text: '' });
     }
 
     isEnabled = enabled;
-    updateUI();
-
-    // Update badge
-    const tab = await getCurrentTab();
-    if (enabled) {
-      chrome.action.setBadgeText({ tabId: tab.id, text: '✓' });
-      chrome.action.setBadgeBackgroundColor({ tabId: tab.id, color: '#4CAF50' });
-    } else {
-      chrome.action.setBadgeText({ tabId: tab.id, text: '' });
-    }
+    updateUI(true); // Show refresh button
   });
 
   // Handle refresh button

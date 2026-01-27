@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "NoPause 视频防暂停",
   "version": "1.0.0",
-  "description": "防止视频在切换标签页时自动暂停",
+  "description": "防止视频在切换标签页或失去焦点后自动暂停",
   "permissions": [
     "storage",
     "activeTab",

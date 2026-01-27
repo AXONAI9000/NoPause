@@ -335,7 +335,7 @@ function updateBadge(tabId, url) {
       const whitelist = result.whitelist || [];
       if (whitelist.includes(domain)) {
         chrome.action.setBadgeText({ tabId, text: '✓' });
-        chrome.action.setBadgeBackgroundColor({ tabId, color: '#4CAF50' });
+        chrome.action.setBadgeBackgroundColor({ tabId, color: '#10b981' });
       } else {
         chrome.action.setBadgeText({ tabId, text: '' });
       }
