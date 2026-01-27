@@ -6,10 +6,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const toggleLabel = document.getElementById('toggleLabel');
   const statusMessage = document.getElementById('statusMessage');
   const refreshHint = document.getElementById('refreshHint');
-  const advancedToggle = document.getElementById('advancedToggle');
-  const advancedArrow = document.getElementById('advancedArrow');
-  const advancedOptions = document.getElementById('advancedOptions');
-  const blockBlurCheckbox = document.getElementById('blockBlurCheckbox');
+  const refreshBtn = document.getElementById('refreshBtn');
 
   let currentDomain = '';
   let isEnabled = false;
@@ -60,14 +57,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       currentDomain = extractDomain(url.hostname);
       currentDomainEl.textContent = currentDomain;
 
-      // Get whitelist and settings
-      const result = await chrome.storage.sync.get(['whitelist', 'settings']);
+      // Get whitelist
+      const result = await chrome.storage.sync.get(['whitelist']);
       const whitelist = result.whitelist || [];
-      const settings = result.settings || { blockBlur: false };
 
       isEnabled = whitelist.includes(currentDomain);
       enableToggle.checked = isEnabled;
-      blockBlurCheckbox.checked = settings.blockBlur;
 
       updateUI();
     } catch (error) {
@@ -90,15 +85,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Try to inject immediately
       const tab = await getCurrentTab();
-      const settings = await chrome.storage.sync.get(['settings']);
-      const blockBlur = settings.settings?.blockBlur || false;
 
       try {
         await chrome.tabs.sendMessage(tab.id, {
           action: 'enableNow',
-          blockBlur: blockBlur
+          blockBlur: true  // Always enable blur blocking
         });
-        needsRefresh = false;
+        // Even if injection succeeds, page scripts may have already added listeners
+        // So we should refresh to ensure full protection
+        needsRefresh = true;
       } catch (e) {
         // Content script might not be ready, show refresh hint
         needsRefresh = true;
@@ -125,24 +120,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Handle advanced toggle
-  advancedToggle.addEventListener('click', () => {
-    advancedOptions.classList.toggle('visible');
-    advancedArrow.classList.toggle('expanded');
-  });
-
-  // Handle block blur checkbox
-  blockBlurCheckbox.addEventListener('change', async () => {
-    const settings = { blockBlur: blockBlurCheckbox.checked };
-    await chrome.runtime.sendMessage({
-      action: 'updateSettings',
-      settings: settings
-    });
-
-    if (isEnabled) {
-      needsRefresh = true;
-      updateUI();
-    }
+  // Handle refresh button
+  refreshBtn.addEventListener('click', async () => {
+    const tab = await getCurrentTab();
+    chrome.tabs.reload(tab.id);
+    window.close();
   });
 
   // Initialize
