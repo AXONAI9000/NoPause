@@ -190,6 +190,51 @@ function injectionFunction() {
   });
   observer.observe(document.documentElement, { childList: true, subtree: true });
 
+  // === Block ad redirects on first click ===
+  const originalWindowOpen = window.open;
+  let recentClick = false;
+  let recentClickTime = 0;
+
+  // Track all clicks for popup blocking
+  originalAddEventListener.call(document, 'click', (e) => {
+    recentClick = true;
+    recentClickTime = Date.now();
+    setTimeout(() => {
+      recentClick = false;
+    }, 500);
+  }, true);
+
+  // Override window.open to block popups triggered by clicks
+  window.open = function(url, target, features) {
+    if (recentClick && (Date.now() - recentClickTime < 500)) {
+      console.log('[NoPause] Blocked ad popup:', url);
+      return null;
+    }
+    return originalWindowOpen.call(window, url, target, features);
+  };
+
+  // Block click events that try to navigate away from video area
+  originalAddEventListener.call(document, 'click', (e) => {
+    const target = e.target;
+    const link = target.closest('a');
+
+    // Check if clicking on or near a video element
+    const isNearVideo = target.closest('video') ||
+                        target.closest('[class*="player"]') ||
+                        target.closest('[class*="video"]') ||
+                        target.closest('[id*="player"]') ||
+                        target.closest('[id*="video"]');
+
+    if (isNearVideo && link && link.target === '_blank') {
+      const linkHost = new URL(link.href, location.href).hostname;
+      if (linkHost !== location.hostname) {
+        console.log('[NoPause] Blocked ad link:', link.href);
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }
+  }, true);
+
   console.log('[NoPause] Protection enabled (blocking: ' + blockedEvents.join(', ') + ')');
 }
 
