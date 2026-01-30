@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "D:\vsodeproject\kirocode\NoPause\.claude\skills\ui-ux-pro-max\scripts\search.py", line 76, in <module>
+    print(result)
+    ~~~~~^^^^^^^^
+UnicodeEncodeError: 'gbk' codec can't encode character '\u26a1' in position 2058: illegal multibyte sequence
