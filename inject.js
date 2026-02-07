@@ -116,6 +116,134 @@
     });
   }
 
+  // === Mini-Video / Ad iframe Blocker ===
+  if (window.__noPauseBlockMiniVideos) {
+    console.log('[NoPause] Mini-video/iframe blocker enabled (inject.js)');
+
+    const adSizes = [
+      [300, 250], [336, 280], [728, 90], [160, 600],
+      [320, 50], [300, 600], [970, 250], [970, 90],
+      [468, 60], [234, 60], [120, 600], [120, 240],
+      [250, 250], [200, 200], [180, 150], [125, 125]
+    ];
+
+    function isAdSize(w, h) {
+      return adSizes.some(([aw, ah]) => Math.abs(w - aw) < 5 && Math.abs(h - ah) < 5);
+    }
+
+    function isMiniAdIframe(iframe) {
+      if (iframe.__noPauseMiniChecked) return false;
+
+      const rect = iframe.getBoundingClientRect();
+      const w = rect.width || parseInt(iframe.getAttribute('width')) || 0;
+      const h = rect.height || parseInt(iframe.getAttribute('height')) || 0;
+
+      if (w === 0 && h === 0) return false;
+
+      if (w > 400 && h > 400) {
+        iframe.__noPauseMiniChecked = true;
+        return false;
+      }
+
+      const src = iframe.src || iframe.getAttribute('data-src') || '';
+      const dataLink = iframe.getAttribute('data-link') || '';
+      const allUrls = src + ' ' + dataLink;
+
+      if (src.startsWith('javascript:') && dataLink) {
+        return true;
+      }
+
+      if (isAdSize(w, h)) {
+        const adPatterns = [
+          'trck', 'track', 'click', 'ad', 'banner', 'popup',
+          'snaptrckr', 'doubleclick', 'googlesyndication',
+          'adserver', 'adnxs', 'adsrv', 'adform'
+        ];
+        const urlLower = allUrls.toLowerCase();
+        for (const pattern of adPatterns) {
+          if (urlLower.includes(pattern)) {
+            return true;
+          }
+        }
+
+        const noScroll = iframe.getAttribute('scrolling') === 'no';
+        const noBorder = iframe.getAttribute('frameborder') === '0' || iframe.style.border === 'none' || iframe.style.border === '0';
+        if (noScroll && noBorder) {
+          return true;
+        }
+      }
+
+      if (w <= 400) {
+        const sidebarSelectors = [
+          'aside',
+          '[class*="sidebar"]', '[class*="Sidebar"]',
+          '[class*="side-bar"]', '[class*="SideBar"]',
+          '[class*="recommend"]', '[class*="Recommend"]',
+          '[class*="related"]', '[class*="Related"]',
+          '[class*="widget"]', '[class*="Widget"]',
+          '[id*="sidebar"]', '[id*="Sidebar"]',
+          '[id*="side-bar"]', '[id*="SideBar"]',
+          '[id*="secondary"]', '[id*="Secondary"]',
+          '[role="complementary"]'
+        ];
+
+        for (const sel of sidebarSelectors) {
+          try {
+            if (iframe.closest(sel)) {
+              const noScroll = iframe.getAttribute('scrolling') === 'no';
+              if (noScroll || src.startsWith('javascript:') || isAdSize(w, h)) {
+                return true;
+              }
+            }
+          } catch (e) {}
+        }
+      }
+
+      iframe.__noPauseMiniChecked = true;
+      return false;
+    }
+
+    function removeAdIframe(iframe) {
+      try {
+        const rect = iframe.getBoundingClientRect();
+        console.log('[NoPause] Removing ad iframe:', iframe.src?.substring(0, 80) || '(no src)',
+          'size:', rect.width + 'x' + rect.height);
+        iframe.src = 'about:blank';
+        iframe.remove();
+      } catch (e) {
+        console.error('[NoPause] Error removing ad iframe:', e);
+      }
+    }
+
+    function scanAdIframes() {
+      const iframes = document.querySelectorAll('iframe');
+      iframes.forEach(iframe => {
+        if (iframe.__noPauseMiniChecked) return;
+        if (isMiniAdIframe(iframe)) {
+          removeAdIframe(iframe);
+        }
+      });
+    }
+
+    setTimeout(scanAdIframes, 500);
+
+    const adIframeObserver = new MutationObserver((mutations) => {
+      let hasNewNodes = false;
+      for (const mutation of mutations) {
+        if (mutation.addedNodes.length > 0) {
+          hasNewNodes = true;
+          break;
+        }
+      }
+      if (hasNewNodes) {
+        setTimeout(scanAdIframes, 500);
+      }
+    });
+    adIframeObserver.observe(document.documentElement, { childList: true, subtree: true });
+
+    setInterval(scanAdIframes, 3000);
+  }
+
   // For pages that use Page Visibility API through other means
   // Override the PageVisibility API if it exists
   if (typeof PageVisibilityAPI !== 'undefined') {

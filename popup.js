@@ -11,6 +11,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const refreshBtn = document.getElementById('refreshBtn');
   const siteCard = document.getElementById('siteCard');
   const toggleCard = document.getElementById('toggleCard');
+  const miniVideoToggle = document.getElementById('miniVideoToggle');
+  const miniVideoDesc = document.getElementById('miniVideoDesc');
+  const miniVideoCard = document.getElementById('miniVideoCard');
 
   let currentDomain = '';
   let isEnabled = false;
@@ -59,6 +62,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     statusIndicator.classList.add('inactive');
     statusText.textContent = '不支持此页面';
     toggleCard.classList.add('disabled');
+    miniVideoToggle.disabled = true;
+    miniVideoCard.classList.add('disabled');
   }
 
   // Initialize popup
@@ -75,12 +80,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       currentDomain = extractDomain(url.hostname);
       currentDomainEl.textContent = currentDomain;
 
-      // Get whitelist
-      const result = await chrome.storage.sync.get(['whitelist']);
+      // Get whitelist and settings
+      const result = await chrome.storage.sync.get(['whitelist', 'settings']);
       const whitelist = result.whitelist || [];
+      const settings = result.settings || { blockBlur: false, blockMiniVideos: false };
 
       isEnabled = whitelist.includes(currentDomain);
       enableToggle.checked = isEnabled;
+
+      // Initialize mini-video toggle
+      miniVideoToggle.checked = settings.blockMiniVideos || false;
+      miniVideoDesc.textContent = settings.blockMiniVideos ? '已启用拦截' : '屏蔽侧边栏小视频';
 
       updateUI(false);
     } catch (error) {
@@ -128,6 +138,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     isEnabled = enabled;
     updateUI(true); // Show refresh button
+  });
+
+  // Handle mini-video toggle change
+  miniVideoToggle.addEventListener('change', async () => {
+    const enabled = miniVideoToggle.checked;
+
+    // Read current settings, update blockMiniVideos, save
+    const result = await chrome.storage.sync.get(['settings']);
+    const settings = result.settings || { blockBlur: false, blockMiniVideos: false };
+    settings.blockMiniVideos = enabled;
+
+    await chrome.runtime.sendMessage({
+      action: 'updateSettings',
+      settings: settings
+    });
+
+    // Update description text
+    miniVideoDesc.textContent = enabled ? '已启用拦截' : '屏蔽侧边栏小视频';
+
+    // Show refresh button
+    actionBar.classList.add('visible');
   });
 
   // Handle refresh button

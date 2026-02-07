@@ -2,15 +2,23 @@
 
 // Initialize storage with default values
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.sync.get(['whitelist'], (result) => {
+  chrome.storage.sync.get(['whitelist', 'settings'], (result) => {
     if (!result.whitelist) {
       chrome.storage.sync.set({ whitelist: [] });
+    }
+    // 初始化或升级 settings
+    const defaults = { blockBlur: false, blockMiniVideos: false };
+    if (!result.settings) {
+      chrome.storage.sync.set({ settings: defaults });
+    } else if (result.settings.blockMiniVideos === undefined) {
+      result.settings.blockMiniVideos = false;
+      chrome.storage.sync.set({ settings: result.settings });
     }
   });
 });
 
 // The injection function that runs in page context
-function injectionFunction() {
+function injectionFunction(settings) {
   if (window.__noPauseInjected) return;
   window.__noPauseInjected = true;
 
@@ -235,6 +243,148 @@ function injectionFunction() {
     }
   }, true);
 
+  // === Mini-Video / Ad iframe Blocker ===
+  if (settings && settings.blockMiniVideos) {
+    console.log('[NoPause] Mini-video/iframe blocker enabled');
+
+    // 常见广告尺寸 (宽x高)
+    const adSizes = [
+      [300, 250], [336, 280], [728, 90], [160, 600],
+      [320, 50], [300, 600], [970, 250], [970, 90],
+      [468, 60], [234, 60], [120, 600], [120, 240],
+      [250, 250], [200, 200], [180, 150], [125, 125]
+    ];
+
+    function isAdSize(w, h) {
+      return adSizes.some(([aw, ah]) => Math.abs(w - aw) < 5 && Math.abs(h - ah) < 5);
+    }
+
+    function isMiniAdIframe(iframe) {
+      if (iframe.__noPauseMiniChecked) return false;
+
+      const rect = iframe.getBoundingClientRect();
+      const w = rect.width || parseInt(iframe.getAttribute('width')) || 0;
+      const h = rect.height || parseInt(iframe.getAttribute('height')) || 0;
+
+      // 尺寸为 0（未完成布局）→ 跳过
+      if (w === 0 && h === 0) return false;
+
+      // 大尺寸 iframe 不拦截（可能是主内容/播放器）
+      if (w > 400 && h > 400) {
+        iframe.__noPauseMiniChecked = true;
+        return false;
+      }
+
+      // 检查 src / data-link
+      const src = iframe.src || iframe.getAttribute('data-src') || '';
+      const dataLink = iframe.getAttribute('data-link') || '';
+      const allUrls = src + ' ' + dataLink;
+
+      // javascript: 协议 + 有 data-link 指向外部 → 高度可疑
+      if (src.startsWith('javascript:') && dataLink) {
+        return true;
+      }
+
+      // 标准广告尺寸匹配
+      if (isAdSize(w, h)) {
+        // 额外检查：是否有追踪/广告域名特征
+        const adPatterns = [
+          'trck', 'track', 'click', 'ad', 'banner', 'popup',
+          'snaptrckr', 'doubleclick', 'googlesyndication',
+          'adserver', 'adnxs', 'adsrv', 'adform'
+        ];
+        const urlLower = allUrls.toLowerCase();
+        for (const pattern of adPatterns) {
+          if (urlLower.includes(pattern)) {
+            return true;
+          }
+        }
+
+        // 标准广告尺寸 + scrolling=no + frameborder=0 → 很可能是广告
+        const noScroll = iframe.getAttribute('scrolling') === 'no';
+        const noBorder = iframe.getAttribute('frameborder') === '0' || iframe.style.border === 'none' || iframe.style.border === '0';
+        if (noScroll && noBorder) {
+          return true;
+        }
+      }
+
+      // 小尺寸 iframe（宽 ≤ 400）在侧边栏中
+      if (w <= 400) {
+        const sidebarSelectors = [
+          'aside',
+          '[class*="sidebar"]', '[class*="Sidebar"]',
+          '[class*="side-bar"]', '[class*="SideBar"]',
+          '[class*="recommend"]', '[class*="Recommend"]',
+          '[class*="related"]', '[class*="Related"]',
+          '[class*="widget"]', '[class*="Widget"]',
+          '[id*="sidebar"]', '[id*="Sidebar"]',
+          '[id*="side-bar"]', '[id*="SideBar"]',
+          '[id*="secondary"]', '[id*="Secondary"]',
+          '[role="complementary"]'
+        ];
+
+        for (const sel of sidebarSelectors) {
+          try {
+            if (iframe.closest(sel)) {
+              // 在侧边栏中的小 iframe，检查是否有广告特征
+              const noScroll = iframe.getAttribute('scrolling') === 'no';
+              if (noScroll || src.startsWith('javascript:') || isAdSize(w, h)) {
+                return true;
+              }
+            }
+          } catch (e) {}
+        }
+      }
+
+      iframe.__noPauseMiniChecked = true;
+      return false;
+    }
+
+    function removeAdIframe(iframe) {
+      try {
+        const rect = iframe.getBoundingClientRect();
+        console.log('[NoPause] Removing ad iframe:', iframe.src?.substring(0, 80) || '(no src)',
+          'size:', rect.width + 'x' + rect.height,
+          'data-link:', (iframe.getAttribute('data-link') || '').substring(0, 60));
+        iframe.src = 'about:blank';
+        iframe.remove();
+      } catch (e) {
+        console.error('[NoPause] Error removing ad iframe:', e);
+      }
+    }
+
+    function scanAdIframes() {
+      const iframes = document.querySelectorAll('iframe');
+      iframes.forEach(iframe => {
+        if (iframe.__noPauseMiniChecked) return;
+        if (isMiniAdIframe(iframe)) {
+          removeAdIframe(iframe);
+        }
+      });
+    }
+
+    // 初始扫描延迟 500ms 等待布局完成
+    setTimeout(scanAdIframes, 500);
+
+    // MutationObserver 监控动态添加的节点
+    const adIframeObserver = new MutationObserver((mutations) => {
+      let hasNewNodes = false;
+      for (const mutation of mutations) {
+        if (mutation.addedNodes.length > 0) {
+          hasNewNodes = true;
+          break;
+        }
+      }
+      if (hasNewNodes) {
+        setTimeout(scanAdIframes, 500);
+      }
+    });
+    adIframeObserver.observe(document.documentElement, { childList: true, subtree: true });
+
+    // 每 3 秒兜底扫描
+    setInterval(scanAdIframes, 3000);
+  }
+
   console.log('[NoPause] Protection enabled (blocking: ' + blockedEvents.join(', ') + ')');
 }
 
@@ -280,7 +430,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.action === 'getSettings') {
     chrome.storage.sync.get(['settings'], (result) => {
-      sendResponse({ settings: result.settings || { blockBlur: false } });
+      sendResponse({ settings: result.settings || { blockBlur: false, blockMiniVideos: false } });
     });
     return true;
   }
@@ -300,21 +450,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
     }
 
-    // Use chrome.scripting.executeScript with MAIN world to bypass CSP
-    // Target specific frame if frameId is provided
-    const target = frameId !== undefined ? { tabId: tabId, frameIds: [frameId] } : { tabId: tabId };
+    // 先读取 settings，再通过 args 传入
+    chrome.storage.sync.get(['settings'], (result) => {
+      const settings = result.settings || { blockBlur: false, blockMiniVideos: false };
+      const target = frameId !== undefined ? { tabId: tabId, frameIds: [frameId] } : { tabId: tabId };
 
-    chrome.scripting.executeScript({
-      target: target,
-      world: 'MAIN',
-      func: injectionFunction,
-      args: []
-    }).then(() => {
-      console.log('[NoPause] Script injected successfully to frame:', frameId);
-      sendResponse({ success: true });
-    }).catch((error) => {
-      console.error('[NoPause] Injection failed:', error);
-      sendResponse({ success: false, error: error.message });
+      chrome.scripting.executeScript({
+        target: target,
+        world: 'MAIN',
+        func: injectionFunction,
+        args: [settings]
+      }).then(() => {
+        console.log('[NoPause] Script injected successfully to frame:', frameId);
+        sendResponse({ success: true });
+      }).catch((error) => {
+        console.error('[NoPause] Injection failed:', error);
+        sendResponse({ success: false, error: error.message });
+      });
     });
     return true;
   }
@@ -339,12 +491,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         chrome.storage.sync.get(['whitelist', 'settings'], (result) => {
           const whitelist = result.whitelist || [];
-          const settings = result.settings || { blockBlur: false };
+          const settings = result.settings || { blockBlur: false, blockMiniVideos: false };
           const whitelisted = whitelist.includes(domain);
 
           sendResponse({
             whitelisted: whitelisted,
-            blockBlur: settings.blockBlur
+            blockBlur: settings.blockBlur,
+            blockMiniVideos: settings.blockMiniVideos || false
           });
         });
       } catch (e) {
